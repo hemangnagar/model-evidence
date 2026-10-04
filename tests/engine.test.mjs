@@ -26,3 +26,18 @@ test('Reject mixed datasets, duplicate IDs, malformed labels, and impossible tar
 test('Prediction agreement aligns IDs even if rows are reordered',()=>{
  const d=demo('strong');d.runs[1].rows.reverse();assert.equal(evaluate(d,policy).agreement,1);
 });
+// v2 additions. The fixture was captured from the v1 engine; every field it holds must still be produced unchanged.
+import {readFileSync} from 'node:fs';
+const strip=v=>Array.isArray(v)?v.map(strip):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).filter(([k])=>!['interval_method','stabilityMetric','clusters','description'].includes(k)).map(([k,x])=>[k,strip(x)])):v;
+test('v1 input and policy produce verdict fields byte-identical to the v1 engine',()=>{
+ const fixtures=JSON.parse(readFileSync(new URL('./fixtures/v1-verdicts.json',import.meta.url),'utf8'));
+ for(const c of fixtures){
+  let input,pol=policy;
+  if(c.label.startsWith('demo-'))input=demo(c.label.slice(5));
+  else{input=demo('strong');input.runs.push(structuredClone(input.runs[0]));input.runs[3].id='repeat';for(const r of input.runs)r.metadata={data_sha256:'a'.repeat(64),recipe_sha256:'b'.repeat(64),environment_sha256:'c'.repeat(64),model_sha256:'d'.repeat(64)};pol={...policy,selectedRun:'seed-1',confidence:false};}
+  const out=JSON.parse(JSON.stringify(evaluate(input,pol)));
+  assert.deepEqual(strip(out),c.verdict,c.label);
+  assert.equal(JSON.stringify(strip(out)),JSON.stringify(c.verdict),c.label+' key order');
+  assert.ok(out.gates.every(g=>g.interval_method==='wilson'));
+ }
+});

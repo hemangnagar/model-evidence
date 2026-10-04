@@ -33,6 +33,20 @@ Import predictions from an already-trained binary classifier as JSON. Set accura
 
 Classification, stability, and reproducibility are separate assessments. A high accuracy score alone does not establish all three. The overall result is **Pass**, **Fail**, or **Insufficient evidence**.
 
+## Views and adapters
+
+The judge is task-blind. Systems under test are judged through an adapter that reduces them to views: named sets of binary rows, each judged on its own axes and targets, with the bundle verdict being the worst required view. Adapters live in their own repositories and depend on a tagged release of this one; this repository never imports, names, or special-cases a system under test. Contract 2.0 adds views, optional (`null`) gates, a per-view stability metric, `cluster_id` rows judged with a cluster-bootstrap interval, inherited bundle-level hashes, and SHA-256 fingerprints of the input and policy in the verdict. Contract 1.0 inputs remain valid and are judged unchanged. The schema and decision rules are in [dist/CONTRACT.md](dist/CONTRACT.md).
+
+## Command line
+
+```bash
+node dist/run-evidence.mjs <bundle.json> <policy.json> [--out verdict.json] [--quiet]
+node dist/run-evidence.mjs dist/examples/bundle-v2.json dist/examples/policy-v2.json      # exit 0, pass
+node dist/run-evidence.mjs dist/examples/predictions-v1.json dist/examples/policy-v1.json  # exit 2, insufficient
+```
+
+The CLI prints a one-screen table of each view's active gates and verdicts, writes the full verdict JSON with `--out`, and exits 0 for pass, 1 for fail, 2 for insufficient evidence, and 3 for an input error, so CI can gate on it. It uses Node built-ins only.
+
 ## Run locally
 
 The web interface has no JavaScript package dependencies or build step. Use Python 3 to serve the static files:
@@ -56,7 +70,7 @@ node dist/run-factory.mjs noise 2026 noisy-experiment.json
 node dist/run-factory.mjs shift 2026 shifted-experiment.json
 ```
 
-The test suite contains 15 checks covering data separation, future-event labels, reproducibility, acceptance decisions, confidence intervals, and malformed inputs.
+The test suite contains 30 checks covering data separation, future-event labels, reproducibility, acceptance decisions, confidence intervals, malformed inputs, contract 2.0 bundles, cluster-bootstrap intervals, and CLI exit codes. The 15 original checks are unchanged, and a fixture pins the v1 verdict fields byte for byte.
 
 ## Optional Python training adapter
 
@@ -79,7 +93,10 @@ CSV input needs a header, finite numeric feature columns, and a final binary lab
 | `dist/factory-worker.js` | Browser worker for actual training |
 | `dist/run-factory.mjs` | Factory command-line runner |
 | `dist/evaluator.html`, `app.js`, `style.css` | Generic evaluator and explanatory guide |
-| `dist/engine.js` | Generic classification acceptance engine |
+| `dist/engine.js` | Generic acceptance engine: views, gates, intervals, verdicts (pure, no I/O) |
+| `dist/run-evidence.mjs` | Acceptance command line with CI exit codes |
+| `dist/CONTRACT.md` | Contract 2.0: input, policy, and verdict schema with decision rules |
+| `dist/examples/` | Committed v1 and v2 example inputs and policies |
 | `dist/train_example.py` | Optional scikit-learn training adapter |
 | `dist/trained-example*.json` | Actual adapter outputs from synthetic data |
 | `dist/README.md` | Detailed evaluation methods and limitations |
@@ -92,10 +109,10 @@ CSV input needs a header, finite numeric feature columns, and a final binary lab
 The factory data is entirely synthetic and independent of any employer product. Good results establish performance against this simplified simulator, not real-world machinery reliability or suitability for automated safety decisions.
 
 - The factory uses whole-machine bootstrap intervals to preserve within-machine dependence. They are approximate, per-metric intervals based on only 20 held-out machines.
-- The generic evaluator uses Wilson intervals that assume independent representative examples.
+- The generic evaluator uses Wilson intervals that assume independent representative examples, or a cluster bootstrap when rows carry a `cluster_id`, which still assumes independent clusters.
 - Repeated validation checks guide model selection and stopping; they are not sequential statistical guarantees. Repeatedly tuning after inspecting final-test results requires fresh test data before making a real acceptance claim.
 - False warnings and missed at-risk observations are hourly checks, not unique service visits. The event-level count is reported separately.
 - Exact reproducibility in the factory applies to the same runtime and configuration. The generic evaluator compares submitted hashes rather than independently rerunning training.
 - More data or more epochs cannot guarantee an arbitrary target. This project does not estimate GPU training cost or orchestrate production training jobs.
 
-See [the detailed methodology](dist/README.md) for the JSON input contract and decision rules.
+See [the detailed methodology](dist/README.md) and [the contract](dist/CONTRACT.md) for the JSON input schema and decision rules.

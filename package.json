@@ -1,1 +1,1 @@
-{"name":"model-evidence","private":true,"type":"module","scripts":{"test":"node --test tests/*.test.mjs"}}
+{"name":"model-evidence","version":"2.0.0","private":true,"type":"module","scripts":{"test":"node --test tests/*.test.mjs"}}

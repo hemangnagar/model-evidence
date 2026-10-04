@@ -36,6 +36,8 @@ This trains SGD classifiers with three seeds plus an identical-seed repeat, reco
 
 ## JSON contract
 
+The authoritative schema is `CONTRACT.md` (contract 2.0): views, optional gates, a per-view stability metric, cluster-bootstrap intervals, inherited hashes, the verdict shape, and the command line `node run-evidence.mjs <bundle.json> <policy.json>` with exit codes 0 pass, 1 fail, 2 insufficient, 3 input error. The contract 1.0 shape below remains valid and is judged as a single view named `default`.
+
     {
       "name": "My experiment",
       "split": "test",
@@ -52,7 +54,7 @@ All runs must cover the identical sample IDs and ground-truth labels. Labels mus
 
 Performance uses the selected run. A point estimate missing its target is FAIL. A point estimate meeting its target but its Wilson interval crossing the target is INSUFFICIENT EVIDENCE when interval enforcement is enabled. Undefined denominators are insufficient evidence. Otherwise the gate passes. Overall performance passes only when every performance gate passes.
 
-Stability requires enough distinct integer seeds, every run's point accuracy meeting the accuracy target, and a max-minus-min accuracy spread within the configured limit. It is descriptive, not a confidence guarantee about future retraining. Pairwise prediction agreement is computed using matched sample IDs and is reported separately. Three seeds are an illustrative starting point, not proof of robust training.
+Stability requires enough distinct integer seeds, every run's point value of the stability metric (accuracy unless the policy says otherwise) meeting that metric's target, and a max-minus-min spread within the configured limit. Gates whose target is null are skipped; a view needs at least one active gate. It is descriptive, not a confidence guarantee about future retraining. Pairwise prediction agreement is computed using matched sample IDs and is reported separately. Three seeds are an illustrative starting point, not proof of robust training.
 
 Reproducibility requires at least one group of repeated runs with the same seed and matching data_sha256, recipe_sha256, environment_sha256 in metadata. All model_sha256 values within every comparable group must match. Hashes are supplied evidence, not independently verified. Exact byte-level model serialization can itself introduce differences; the adapter hashes deterministic inference parameters and preprocessing state. Its environment fingerprint includes versions/platform but is not a complete dependency/BLAS/hardware attestation.
 
@@ -61,6 +63,7 @@ The overall verdict combines all three axes: any failure fails; otherwise any un
 ## Statistical boundaries
 
 - Wilson intervals are 95% two-sided per metric and assume independent representative observations. They are not simultaneous coverage across all metrics/runs and not sequentially valid stopping certificates.
+- Rows that carry a `cluster_id` are judged with a 95% cluster-bootstrap percentile interval (1000 whole-cluster resamples, seeded by run id). It respects within-cluster dependence but assumes independent clusters and is unreliable with very few clusters.
 - The adapter's repeated validation checks guide stopping only. Final acceptance requires the untouched test set. Never repeatedly tune on that test set; obtain fresh evaluation data after model or policy tuning.
 - A confidence interval addresses sampling uncertainty, not distribution shift, label errors, leakage, or biased sampling.
 - Passing overall accuracy can hide minority-class errors. Use appropriate task-specific gates. This version is binary only and does not provide subgroup checks, calibrated probability decisions, multiclass evaluation, or deployment monitoring.
@@ -70,4 +73,4 @@ The overall verdict combines all three axes: any failure fails; otherwise any un
 
 ## Implementation
 
-The evaluation engine is framework-independent JavaScript in engine.js. The interface is static HTML/CSS/JS. There are no runtime JavaScript dependencies. The Python training adapter uses scikit-learn. Unit tests cover the statistical decisions and failure cases. Source is preserved with this Site.
+The evaluation engine is framework-independent JavaScript in engine.js; it is a pure function of input and policy with no I/O. `run-evidence.mjs` is the command line. The interface is static HTML/CSS/JS. There are no runtime JavaScript dependencies. The Python training adapter uses scikit-learn. Unit tests cover the statistical decisions and failure cases. Source is preserved with this Site.
